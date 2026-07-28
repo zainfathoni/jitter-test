@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1 — Backoff spaces the herd out; only jitter breaks it up</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<a class="skip" href="#lesson-main">Skip to lesson content</a>
+<main id="lesson-main">
+
+<h1>Backoff spaces the herd out. Only jitter breaks it up.</h1>
+<p class="sub">Lesson 1 · the one idea behind the word you heard in the rant</p>
+
+<p>A service hiccups. Sixty clients get an error at the same instant. Every one of them
+is a well-behaved citizen running textbook exponential backoff, so every one of them
+waits — politely, patiently — and retries.</p>
+
+<p>At exactly the same moment as all the others.</p>
+
+<p>That is the whole problem in one sentence, and it is the thing most people get wrong
+about backoff. Doubling the delay makes the herd <em>rarer</em>. It does not make the herd
+<em>smaller</em>. Sixty clients that failed together will fail together again, and again,
+because they are all computing the same number from the same formula at the same time.
+They are <strong>correlated</strong>, and no amount of doubling removes correlation.</p>
+
+<p>Jitter is the fix: deliberately randomising each client's wait so the fleet stops moving
+as one block. Below is a simulator. Don't take the claim on trust — go break it.</p>
+
+<h2>Micro-world: the retry storm</h2>
+
+<div class="mw" id="storm">
+  <h3>Retry storm simulator</h3>
+  <p class="mw-note">Sixty clients all hit a struggling server at tick&nbsp;0. The server accepts
+  only <em>capacity</em> requests per tick; everyone else is rejected and backs off. <em>Largest
+  retry burst</em> is the one to watch — it counts how many clients still land on a single tick
+  <em>after</em> the initial hit, which is exactly how intact the herd still is. Deterministic for
+  a given seed, so you can replay and compare runs exactly.</p>
+
+  <div class="mw-controls">
+    <div class="mw-field">
+      <label for="mw-strategy">Backoff strategy</label>
+      <select id="mw-strategy">
+        <option value="none" selected>No jitter (plain exponential)</option>
+        <option value="full">Full jitter</option>
+        <option value="equal">Equal jitter</option>
+        <option value="decorr">Decorrelated jitter</option>
+      </select>
+    </div>
+    <div class="mw-field">
+      <label for="mw-clients">Clients</label>
+      <input type="number" id="mw-clients" value="60" min="1" max="400" step="1">
+    </div>
+    <div class="mw-field">
+      <label for="mw-capacity">Server capacity / tick</label>
+      <input type="number" id="mw-capacity" value="4" min="1" max="400" step="1">
+    </div>
+    <div class="mw-field">
+      <label for="mw-base">Base delay (ticks)</label>
+      <input type="number" id="mw-base" value="8" min="1" max="50" step="1">
+    </div>
+    <div class="mw-field">
+      <label for="mw-cap">Cap (ticks)</label>
+      <input type="number" id="mw-cap" value="64" min="1" max="500" step="1">
+    </div>
+    <div class="mw-field">
+      <label for="mw-seed">Seed</label>
+      <input type="number" id="mw-seed" value="7" min="1" max="99999" step="1">
+    </div>
+  </div>
+
+  <div class="mw-actions">
+    <button type="button" id="mw-run">Run</button>
+    <button type="button" class="secondary" id="mw-compare">Compare all four</button>
+    <button type="button" class="secondary" id="mw-reset">Reset defaults</button>
+  </div>
+
+  <div class="mw-chart-wrap">
+    <div class="mw-chart" id="mw-chart" aria-hidden="true"></div>
+    <div class="mw-axis" aria-hidden="true"><span>tick 0</span><span id="mw-axis-end">—</span></div>
+  </div>
+  <p class="mw-legend" aria-hidden="true">
+    <span><span class="mw-swatch" style="background:#2e7d32"></span>served</span>
+    <span><span class="mw-swatch" style="background:#b23b3b"></span>throttled (will retry)</span>
+    <span>each column is one tick</span>
+  </p>
+
+  <div class="mw-metrics">
+    <div class="mw-metric"><span class="v" id="mw-finish">—</span><span class="k">Completion tick</span></div>
+    <div class="mw-metric"><span class="v" id="mw-calls">—</span><span class="k">Total calls</span></div>
+    <div class="mw-metric"><span class="v" id="mw-wasted">—</span><span class="k">Wasted calls</span></div>
+    <div class="mw-metric"><span class="v" id="mw-peak">—</span><span class="k">Largest retry burst</span></div>
+    <div class="mw-metric"><span class="v" id="mw-active">—</span><span class="k">Active ticks</span></div>
+  </div>
+
+  <p class="mw-note" id="mw-summary" role="status"></p>
+  <div id="mw-compare-out"></div>
+
+  <div class="mw-try">
+    <strong>Things to try</strong>
+    <ol>
+      <li>Run it as-is, on <em>No jitter</em>. A handful of tall, isolated spikes with dead air
+      between them, dragging on to tick&nbsp;760. The largest retry burst is <strong>56 of 60</strong>:
+      after all that backing off, the herd is still almost perfectly intact.</li>
+      <li>Change <em>only</em> the strategy to <em>Full jitter</em>. Same seed, same everything.
+      Completion drops from 760 to 30, total calls from 480 to 145, and the largest retry burst
+      from 56 to 12. Nothing got faster per client — the block just stopped arriving as a block.</li>
+      <li>Press <em>Compare all four</em>. Note that <em>Equal jitter</em> finishes at 52 while
+      <em>Full</em> finishes at 30: keeping a guaranteed half of the delay keeps half the
+      correlation too. That is the trade-off the name hides.</li>
+      <li>Now set <em>capacity</em> to 60 so nobody is ever throttled, and try every strategy.
+      They all finish on tick 0 and jitter changes nothing at all. Work out why — the answer
+      <em>is</em> what jitter is for.</li>
+      <li>Back to capacity 4. On <em>Full jitter</em>, change only the seed a few times: the shape
+      wobbles, the outcome barely moves. On <em>No jitter</em>, the seed does nothing whatsoever.
+      Why not?</li>
+    </ol>
+  </div>
+</div>
+
+<h2>What the four strategies actually compute</h2>
+
+<p>Marc Brooker named these in the 2015 AWS post that made jitter standard practice. All four
+pick a sleep duration after a failed attempt; they differ only in how much randomness they let in.</p>
+
+<figure>
+  <figcaption>The four backoff strategies, as pseudocode.</figcaption>
+  <p class="listen"><b>Listen first:</b> plain exponential backoff sets sleep to base times two
+  raised to the attempt number, clamped by a cap — fully determined, so every client that failed
+  together picks the identical number. Full jitter takes that same clamped value and picks a
+  uniform random number anywhere between zero and it. Equal jitter keeps half of the clamped value
+  as a guaranteed floor and randomises only the other half. Decorrelated jitter ignores the attempt
+  counter entirely and picks a random value between the base and three times whatever the client
+  slept last time, so each client's delay wanders away from its neighbours' over successive attempts.</p>
+  <pre aria-hidden="true">No jitter:     sleep = min(cap, base * 2^attempt)
+
+Full:          sleep = random(0, min(cap, base * 2^attempt))
+
+Equal:         temp  = min(cap, base * 2^attempt)
+               sleep = temp/2 + random(0, temp/2)
+
+Decorrelated:  sleep = min(cap, random(base, sleep_prev * 3))</pre>
+</figure>
+
+<p>Notice what changes across the list: not the <em>size</em> of the delay, but how much of it is
+predictable. The no-jitter line contains no randomness at all, which is precisely why every client
+lands on the same tick. Equal jitter is the instinctive compromise — "surely we should still
+guarantee a minimum wait?" — and it is measurably the worst of the three jittered options, because
+that guaranteed half is exactly the correlated part you were trying to destroy.</p>
+
+<blockquote>"But full jitter can pick a sleep of nearly zero — isn't that rude to a struggling
+server?" One client retrying immediately is not the problem. Sixty clients retrying
+<em>simultaneously</em> is. Full jitter trades a slightly rude individual for a fleet that never
+arrives as a block, and Brooker's simulations show it wins on both total work and completion time.</blockquote>
+
+<h2>What this lesson is deliberately not claiming</h2>
+
+<p>Jitter breaks up correlation. That is all it does. It does not reduce the total amount of work
+a client fleet will eventually send, and if clients keep arriving indefinitely, spreading retries
+out just defers load rather than shedding it. Brooker's own 2022 follow-up is blunt about this:
+the only cure for sustained overload is to reduce load. Jitter is the right tool for a
+<em>spike</em>, not for a system that is simply too small.</p>
+
+<div class="defense">
+<b>Cold-recall defense (one breath):</b><br>
+Exponential backoff makes retries rarer but keeps them <b>synchronised</b> — every client that
+failed together computes the identical delay and comes back together. Jitter randomises the wait
+so the fleet decorrelates. It buys nothing when there's no contention, and it defers rather than
+removes load. Default to <code>full</code> jitter; <code>equal</code> jitter preserves the very
+correlation you were trying to kill.
+</div>
+
+<h2>Check yourself</h2>
+
+<div class="qz" id="quiz">
+  <h3>Three questions</h3>
+</div>
+
+<h2>Read next</h2>
+<ul>
+  <li>Lesson 2 (not yet written) — full vs equal vs decorrelated, and what each trade-off costs</li>
+  <li>Lesson 3 (not yet written) — the same mechanism outside retries: cron spread, cache stampedes, pollers</li>
+</ul>
+
+<h2>Primary source</h2>
+<p><a href="https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/">"Exponential
+Backoff And Jitter" — Marc Brooker, AWS Architecture Blog, 4 March 2015</a>. About a 7-minute read,
+and the origin of the Full / Equal / Decorrelated names. Its companion is Brooker's
+<a href="https://brooker.co.za/blog/2022/08/11/backoff.html">"What is Backoff For?" (2022)</a>,
+which walks back the over-application of the first.</p>
+
+<p class="ask">💬 I'm your teacher for this — ask me followups any time.</p>
+
+<p class="foot">Lesson 1 · workspace <code>jitter-test</code> · mission: build durable intuition for
+backoff jitter, no production code target</p>
+
+</main>
+
+<script src="../assets/backoff-sim.js"></script>
+<script src="../assets/quiz.js"></script>
+<script>
+(function () {
+  var DEFAULTS = { strategy: 'none', clients: 60, capacity: 4, base: 8, cap: 64, seed: 7 };
+  var MAX_COLS = 180;
+
+  var el = function (id) { return document.getElementById(id); };
+  var chart = el('mw-chart'), compareOut = el('mw-compare-out');
+
+  function readParams() {
+    return {
+      strategy: el('mw-strategy').value,
+      clients:  Math.max(1, Number(el('mw-clients').value)  || DEFAULTS.clients),
+      capacity: Math.max(1, Number(el('mw-capacity').value) || DEFAULTS.capacity),
+      base:     Math.max(1, Number(el('mw-base').value)     || DEFAULTS.base),
+      cap:      Math.max(1, Number(el('mw-cap').value)      || DEFAULTS.cap),
+      seed:     Math.max(1, Number(el('mw-seed').value)     || DEFAULTS.seed),
+      maxTicks: 900
+    };
+  }
+
+  /*
+    Long runs are bucketed rather than truncated: a no-jitter run can last 700+
+    ticks, and cutting it off would hide exactly the point — the isolated spikes
+    marching on with dead air between them. Bucket width is disclosed on the axis.
+  */
+  function drawChart(result) {
+    chart.textContent = '';
+    var raw = result.ticks;
+    var width = Math.max(1, Math.ceil(raw.length / MAX_COLS));
+    var cols = [];
+    for (var i = 0; i < raw.length; i += width) {
+      var served = 0, failed = 0;
+      for (var j = i; j < Math.min(i + width, raw.length); j++) {
+        served += raw[j].served; failed += raw[j].failed;
+      }
+      cols.push({ served: served, failed: failed });
+    }
+    var top = cols.reduce(function (m, c) { return Math.max(m, c.served + c.failed); }, 1);
+    var H = 150;
+
+    cols.forEach(function (c) {
+      var col = document.createElement('div');
+      col.className = 'mw-tick';
+      if (c.failed > 0) {
+        var f = document.createElement('div');
+        f.className = 'mw-bar-failed';
+        f.style.height = Math.max(1, Math.round(c.failed / top * H)) + 'px';
+        col.appendChild(f);
+      }
+      if (c.served > 0) {
+        var s = document.createElement('div');
+        s.className = 'mw-bar-served';
+        s.style.height = Math.max(1, Math.round(c.served / top * H)) + 'px';
+        col.appendChild(s);
+      }
+      chart.appendChild(col);
+    });
+
+    el('mw-axis-end').textContent = 'tick ' + Math.max(0, raw.length - 1) +
+      (width > 1 ? ' · each column = ' + width + ' ticks' : ' · one column per tick');
+  }
+
+  function run() {
+    compareOut.textContent = '';
+    var p = readParams();
+    var r = runSim(p);
+
+    el('mw-finish').textContent = r.completed ? r.finishTick : 'did not finish';
+    el('mw-finish').parentNode.className = 'mw-metric' + (r.completed ? '' : ' bad');
+    el('mw-calls').textContent   = r.totalCalls;
+    el('mw-wasted').textContent  = r.wastedCalls;
+    el('mw-peak').textContent    = r.peakRetry + ' / ' + p.clients;
+    el('mw-active').textContent  = r.activeTicks;
+
+    drawChart(r);
+
+    el('mw-summary').textContent =
+      STRATEGIES[p.strategy].label + ': ' + p.clients + ' clients against capacity ' +
+      p.capacity + '/tick — ' +
+      (r.completed
+        ? 'all finished by tick ' + r.finishTick
+        : 'did NOT finish within ' + p.maxTicks + ' ticks (' + r.remaining + ' still retrying)') +
+      ', using ' + r.totalCalls + ' calls of which ' + r.wastedCalls + ' were rejected. ' +
+      'The biggest retry burst put ' + r.peakRetry + ' of the ' + p.clients +
+      ' clients on a single tick, and requests touched ' + r.activeTicks + ' distinct ticks in total.';
+  }
+
+  function compare() {
+    var p = readParams();
+    var rows = ['none', 'full', 'equal', 'decorr'].map(function (s) {
+      var r = runSim(Object.assign({}, p, { strategy: s }));
+      return { s: s, r: r };
+    });
+    var best = rows
+      .filter(function (x) { return x.r.completed; })
+      .sort(function (a, b) { return a.r.finishTick - b.r.finishTick; })[0];
+
+    var html = '<table><caption class="mw-note" style="text-align:left;caption-side:top">' +
+      'All four strategies at the current settings (seed ' + p.seed + '). ' +
+      'Row highlighted = earliest completion.</caption>' +
+      '<thead><tr><th scope="col">Strategy</th><th scope="col">Completion tick</th>' +
+      '<th scope="col">Total calls</th><th scope="col">Largest retry burst</th>' +
+      '<th scope="col">Active ticks</th></tr></thead><tbody>';
+
+    rows.forEach(function (x) {
+      var r = x.r;
+      html += '<tr' + (best && best.s === x.s ? ' class="win"' : '') + '>' +
+        '<td>' + STRATEGIES[x.s].label + '</td>' +
+        '<td class="num">' + (r.completed ? r.finishTick : 'DNF') + '</td>' +
+        '<td class="num">' + r.totalCalls + '</td>' +
+        '<td class="num">' + r.peakRetry + ' / ' + p.clients + '</td>' +
+        '<td class="num">' + r.activeTicks + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    compareOut.innerHTML = html;
+  }
+
+  el('mw-run').addEventListener('click', run);
+  el('mw-compare').addEventListener('click', compare);
+  el('mw-reset').addEventListener('click', function () {
+    el('mw-strategy').value = DEFAULTS.strategy;
+    el('mw-clients').value  = DEFAULTS.clients;
+    el('mw-capacity').value = DEFAULTS.capacity;
+    el('mw-base').value     = DEFAULTS.base;
+    el('mw-cap').value      = DEFAULTS.cap;
+    el('mw-seed').value     = DEFAULTS.seed;
+    run();
+  });
+  ['mw-strategy','mw-clients','mw-capacity','mw-base','mw-cap','mw-seed'].forEach(function (id) {
+    el(id).addEventListener('change', run);
+  });
+
+  run();
+
+  Quiz.mount(el('quiz'), {
+    questions: [
+      {
+        q: 'With plain exponential backoff and no jitter, sixty clients throttled on the same tick will make their next attempt:',
+        options: [
+          'spread evenly across the backoff window',
+          'all together, on one identical tick',
+          'one at a time, in ascending client order',
+          'never, because they abandon the request'
+        ],
+        answer: 1,
+        why: 'The formula contains no randomness, so identical inputs give identical delays. ' +
+             'Run the micro-world on No jitter and count the spikes: the herd stays whole.'
+      },
+      {
+        q: "Jitter's primary job is to reduce:",
+        options: [
+          'the average wait experienced per client',
+          'the total number of clients retrying',
+          'the correlation between clients’ retries',
+          'the server’s per-request processing cost'
+        ],
+        answer: 2,
+        why: 'Jitter decorrelates. The average wait under full jitter is actually about half ' +
+             'the unjittered delay, and the client count never changes — what changes is that ' +
+             'clients stop arriving as one block. Watch the Largest retry burst metric: ' +
+             '56 of 60 without jitter, 12 of 60 with it.'
+      },
+      {
+        q: 'Adding jitter buys you essentially nothing when:',
+        options: [
+          'the server never throttles anyone',
+          'the backoff cap is set very high',
+          'the client fleet is extremely large',
+          'the base delay is only a few ticks'
+        ],
+        answer: 0,
+        why: 'No contention means no failures, no retries, and nothing to decorrelate. ' +
+             'Set capacity to 60 in the micro-world and every strategy finishes on tick 0.'
+      }
+    ]
+  });
+})();
+</script>
+</body>
+</html>

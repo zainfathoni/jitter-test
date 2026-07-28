@@ -1,0 +1,154 @@
+/*
+  Shared lesson stylesheet for the jitter-test teaching workspace.
+  Seeded from the /teach canonical lesson baseline, extended with the
+  micro-world (.mw-*) and in-page quiz (.qz-*) components.
+
+  Portability rules for this workspace:
+  - must work over file:// with no build step and no CDN;
+  - every dark container re-asserts nested code colour (cascade-gap bug);
+  - body text meets WCAG AA contrast.
+*/
+
+:root {
+  --ink:#1a1a1a; --muted:#6b6b6b; --rule:#e0ddd6; --accent:#2e5c7a;
+  --add:#2e7d32; --del:#b23b3b; --warn:#9a7d1f;
+  --served:#2e7d32; --failed:#b23b3b; --panel:#f4f6f8;
+}
+
+body {
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  max-width:44rem; margin:3rem auto; padding:0 1.5rem; color:var(--ink);
+  line-height:1.58; background:#fbfaf7;
+}
+
+h1 { font-size:1.9rem; line-height:1.15; margin-bottom:.2rem; }
+.sub { color:var(--muted); font-style:italic; margin-top:0; }
+h2 { font-size:1.15rem; margin-top:2.2rem; border-bottom:1px solid var(--rule);
+     padding-bottom:.25rem; }
+h3 { font-size:1rem; margin-top:1.5rem; color:var(--accent); }
+
+code { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:.84em;
+       background:#eef1f4; padding:.1em .3em; border-radius:3px; }
+figure { margin:1.2rem 0; }
+figcaption { font-size:.86rem; color:var(--muted); margin-bottom:.35rem; }
+pre { background:var(--panel); border-left:3px solid var(--accent); padding:.9rem 1rem;
+      overflow-x:auto; font-family:"SF Mono",Menlo,Consolas,monospace; font-size:.79rem;
+      line-height:1.45; }
+
+blockquote { border-left:3px solid var(--warn); margin:1.2rem 0; padding:.3rem 1rem;
+             color:#3a3a3a; background:#faf6ea; }
+table { border-collapse:collapse; width:100%; font-size:.82rem; margin:1rem 0; }
+th,td { border:1px solid var(--rule); padding:.45rem .55rem; text-align:left;
+        vertical-align:top; }
+th { background:#eef1f4; }
+
+.defense { background:#1a1a1a; color:#f4f1e8; padding:1rem 1.2rem; border-radius:6px;
+           margin:1.4rem 0; }
+.defense b { color:#e8c98a; }
+.defense code { background:#3a3f44; color:#f4f1e8; }
+
+a { color:var(--accent); }
+.add { color:var(--add); } .del { color:var(--del); }
+.foot { margin-top:2.5rem; border-top:1px solid var(--rule); padding-top:1rem;
+        font-size:.85rem; color:var(--muted); }
+.ask { background:#eef4f7; border:1px solid #cfe0e8; border-radius:6px;
+       padding:.7rem 1rem; font-size:.9rem; }
+.listen { background:#fff7df; border:1px solid #eadca8; border-radius:6px;
+          padding:.7rem 1rem; font-size:.9rem; }
+.listen code { background:#f2e6c2; }
+
+.skip { position:absolute; left:-999px; top:auto; width:1px; height:1px; overflow:hidden; }
+.skip:focus { left:1rem; top:1rem; width:auto; height:auto; padding:.5rem .7rem;
+              background:#fff; border:2px solid var(--accent); border-radius:4px; z-index:1; }
+
+/* ---------- Micro-world ---------- */
+
+.mw { border:1px solid var(--rule); border-radius:8px; background:#fff;
+      padding:1rem 1.1rem 1.2rem; margin:1.5rem 0;
+      font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+.mw h3 { margin-top:0; font-family:inherit; }
+
+.mw-controls { display:flex; flex-wrap:wrap; gap:.9rem 1.2rem; margin-bottom:1rem; }
+.mw-field { display:flex; flex-direction:column; gap:.2rem; font-size:.78rem;
+            color:var(--muted); }
+.mw-field label { font-weight:600; color:var(--ink); }
+.mw-field input, .mw-field select {
+  font:inherit; font-size:.85rem; padding:.28rem .4rem; border:1px solid #c8ccd2;
+  border-radius:4px; background:#fff; color:var(--ink); min-width:7.5rem;
+}
+.mw-field input[type=range] { padding:0; min-width:9rem; }
+
+.mw button { font:inherit; font-size:.85rem; font-weight:600; padding:.42rem .9rem;
+             border:1px solid var(--accent); border-radius:5px; background:var(--accent);
+             color:#fff; cursor:pointer; }
+.mw button.secondary { background:#fff; color:var(--accent); }
+.mw button:hover { filter:brightness(1.08); }
+.mw button:focus-visible, .mw input:focus-visible, .mw select:focus-visible {
+  outline:3px solid #8fc0da; outline-offset:1px;
+}
+.mw-actions { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1rem; }
+
+.mw-chart-wrap { overflow-x:auto; border:1px solid var(--rule); border-radius:5px;
+                 background:var(--panel); padding:.6rem .5rem .3rem; }
+.mw-chart { display:flex; align-items:flex-end; gap:1px; height:150px; min-width:100%; }
+.mw-tick { flex:1 0 3px; display:flex; flex-direction:column; justify-content:flex-end;
+           height:100%; }
+.mw-bar-failed { background:var(--failed); }
+.mw-bar-served { background:var(--served); }
+.mw-axis { display:flex; justify-content:space-between; font-size:.7rem;
+           color:var(--muted); margin-top:.3rem; }
+
+.mw-legend { display:flex; gap:1rem; font-size:.75rem; color:var(--muted);
+             margin:.5rem 0 0; flex-wrap:wrap; }
+.mw-swatch { display:inline-block; width:.7rem; height:.7rem; border-radius:2px;
+             margin-right:.3rem; vertical-align:-1px; }
+
+.mw-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(8rem,1fr));
+              gap:.6rem; margin:1rem 0 0; }
+.mw-metric { background:var(--panel); border:1px solid var(--rule); border-radius:5px;
+             padding:.5rem .6rem; }
+.mw-metric .v { font-size:1.25rem; font-weight:700; display:block; line-height:1.15; }
+.mw-metric .k { font-size:.7rem; color:var(--muted); text-transform:uppercase;
+                letter-spacing:.03em; }
+.mw-metric.bad .v { color:var(--del); }
+
+.mw-note { font-size:.78rem; color:var(--muted); margin:.6rem 0 0; }
+.mw-try { background:#eef4f7; border:1px solid #cfe0e8; border-radius:6px;
+          padding:.7rem 1rem; font-size:.85rem; margin-top:1rem;
+          font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+.mw-try ol { margin:.4rem 0 0; padding-left:1.2rem; }
+.mw-try li { margin:.3rem 0; }
+
+.mw table { font-size:.78rem; }
+.mw table td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.mw tr.win td { background:#eaf5ea; font-weight:600; }
+
+/* ---------- In-page quiz ---------- */
+
+.qz { border:1px solid var(--rule); border-radius:8px; background:#fff;
+      padding:1rem 1.1rem 1.2rem; margin:1.5rem 0;
+      font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:.9rem; }
+.qz h3 { margin-top:0; font-family:inherit; }
+.qz fieldset { border:0; padding:0; margin:0 0 1.2rem; }
+.qz legend { font-weight:600; margin-bottom:.45rem; padding:0; }
+.qz .opt { display:block; margin:.3rem 0; padding:.35rem .5rem; border-radius:4px;
+           cursor:pointer; }
+.qz .opt:hover { background:#f1f4f7; }
+.qz .opt input { margin-right:.5rem; }
+.qz button { font:inherit; font-weight:600; padding:.45rem 1rem; border-radius:5px;
+             border:1px solid var(--accent); background:var(--accent); color:#fff;
+             cursor:pointer; }
+.qz button:focus-visible, .qz input:focus-visible { outline:3px solid #8fc0da;
+                                                    outline-offset:2px; }
+.qz .fb { margin-top:.5rem; padding:.55rem .75rem; border-radius:5px; font-size:.85rem;
+          display:none; }
+.qz .fb.show { display:block; }
+.qz .fb.ok { background:#eaf5ea; border:1px solid #b9dcb9; color:#1e5c22; }
+.qz .fb.no { background:#fbeaea; border:1px solid #e4bcbc; color:#8a2b2b; }
+.qz .score { font-weight:700; margin-top:.8rem; }
+
+@media (max-width:34rem) {
+  body { margin:1.5rem auto; }
+  .mw-controls { gap:.7rem .9rem; }
+  .mw-field input, .mw-field select { min-width:6rem; }
+}
