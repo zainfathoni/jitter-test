@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This site uses local HTML, CSS, and JavaScript. It has no install or build step.
+start=$SECONDS
+echo 'Checking tools for the static lesson site...'
+command -v node >/dev/null
+command -v agent-browser >/dev/null
+echo "Orb setup ready in $((SECONDS - start))s; no dependencies to install."

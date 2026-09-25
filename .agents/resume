@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# No authentication or backing services need repair after an orb wakes.
+echo 'Static lesson site ready.'
